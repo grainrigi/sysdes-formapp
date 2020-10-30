@@ -99,7 +99,7 @@ class SessionServerHandler(socket: Socket) extends Handler(socket) {
 
   def extractState(headers: mutable.HashMap[String, String]): (Option[UUID], State) = {
     (for {
-      raw   <- headers.get("Cookie")
+      raw   <- headers.get("cookie")
       id    <- new Cookies(raw).values.get("session-id")
       state <- states.get(UUID.fromString(id))
     } yield state) match {
