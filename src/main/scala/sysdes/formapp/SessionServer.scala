@@ -2,10 +2,10 @@ package sysdes.formapp
 
 import sysdes.formapp.http.Method._
 import java.net.Socket
-import java.util.UUID
+import java.util.{Base64, UUID}
 
 import sysdes.formapp.http.Cookies
-import sysdes.formapp.server.{Handler, PersistedStore, Server}
+import sysdes.formapp.server.{Handler, PersistedStore, Server, Unauthorized}
 
 import scala.collection.mutable
 
@@ -43,6 +43,10 @@ class SessionServerHandler(socket: Socket) extends Handler(socket) {
   import http.Util._
 
   def handle(request: Request): Response = {
+    // process authorization
+    val unauth = checkAuthorization(request.headers)
+    if (unauth.isDefined) return unauth.get
+
     val (id, generated, state) = extractState(request.headers)
     val orgState               = state.copy()
     val response               = handleForm(request, state)
@@ -128,6 +132,23 @@ class SessionServerHandler(socket: Socket) extends Handler(socket) {
         val state = new State("", "", "")
         val id    = UUID.randomUUID().toString
         (id, true, state)
+    }
+  }
+
+  def checkAuthorization(headers: mutable.HashMap[String, String]): Option[Response] = {
+    (for {
+      auth <- headers.get("authorization").collect { case s"Basic $auth" => auth }
+      (user, pass) <- (try {
+        Some(new String(Base64.getDecoder.decode(auth)))
+      } catch { case _: Throwable => None }).collect { case s"$user:$pass" => (user, pass) }
+      authorized <- Some(user == "user" && pass == "password")
+    } yield authorized) match {
+      case Some(true) => None
+      case _ => {
+        val res = Unauthorized("401 Unauthorized")
+        res.addHeader("WWW-Authenticate", "Basic realm=Secure Zone")
+        Some(res)
+      }
     }
   }
 }
