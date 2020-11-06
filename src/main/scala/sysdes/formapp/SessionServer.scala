@@ -5,7 +5,7 @@ import java.net.Socket
 import java.util.UUID
 
 import sysdes.formapp.http.Cookies
-import sysdes.formapp.server.{Handler, Server}
+import sysdes.formapp.server.{Handler, PersistedStore, Server}
 
 import scala.collection.mutable
 
@@ -16,9 +16,26 @@ object SessionServer extends Server(8002) {
 object SessionServerHandler {
   // インスタンス間で共有する内部状態に関する変数・関数はこの中に記述
   val states: mutable.HashMap[UUID, State] = mutable.HashMap()
+
+  val store: PersistedStore = new PersistedStore("sessions.aof")
 }
 
-class State(var name: String, var gender: String, var message: String)
+case class State(var name: String, var gender: String, var message: String)
+object State {
+  implicit def fromString(raw: String): State = {
+    val Array(name, gender, message) = raw
+      .split(",", -1)
+      .map(_.replace("\u0000", ","))
+    State(name, gender, message)
+  }
+
+  implicit def serialize(state: State): String = {
+    val State(name, gender, message) = state
+    List(name, gender, message)
+      .map(_.replace(",", "\u0000"))
+      .mkString(",")
+  }
+}
 
 class SessionServerHandler(socket: Socket) extends Handler(socket) {
   import sysdes.formapp.server.{NotFound, Ok, Request, Response}
@@ -26,9 +43,11 @@ class SessionServerHandler(socket: Socket) extends Handler(socket) {
   import http.Util._
 
   def handle(request: Request): Response = {
-    val (id, state) = extractState(request.headers)
-    val response    = handleForm(request, state)
-    for (uid <- id) response.addHeader("Set-Cookie", s"""session-id=$uid""")
+    val (id, generated, state) = extractState(request.headers)
+    val orgState               = state.copy()
+    val response               = handleForm(request, state)
+    if (generated) response.addHeader("Set-Cookie", s"""session-id=$id""")
+    if (generated || state != orgState) store.append(id, state)
     response
   }
 
@@ -98,18 +117,17 @@ class SessionServerHandler(socket: Socket) extends Handler(socket) {
        |</html>""".stripMargin
   }
 
-  def extractState(headers: mutable.HashMap[String, String]): (Option[UUID], State) = {
+  def extractState(headers: mutable.HashMap[String, String]): (String, Boolean, State) = {
     (for {
       raw   <- headers.get("cookie")
       id    <- new Cookies(raw).values.get("session-id")
-      state <- states.get(UUID.fromString(id))
-    } yield state) match {
-      case Some(state) => (None, state)
+      state <- store.get(id)
+    } yield (id, state)) match {
+      case Some((id, state)) => (id, false, state)
       case None =>
         val state = new State("", "", "")
-        val id    = UUID.randomUUID()
-        states.put(id, state)
-        (Some(id), state)
+        val id    = UUID.randomUUID().toString
+        (id, true, state)
     }
   }
 }
