@@ -22,16 +22,8 @@ class StatelessServerHandler(socket: Socket) extends Handler(socket) {
   dispatcher.bind("/message", POST, (req, _) => message(req.body.get))
   dispatcher.bind("/confirm", POST, (req, _) => confirm(req.body.get))
 
-  val outerD = new Dispatcher
-  outerD.bindSub("/hoge", dispatcher)
-  outerD.bind("/hoge/:id/:name", GET, (_, params) => {
-    println(params)
-    NotFound("fuga")
-  })
-
   override def handle(request: Request): Response = {
-    outerD.dump
-    outerD
+    dispatcher
       .dispatch(DispatchContext.fromRequest(request))
       .getOrElse(NotFound(s"Requested resource '${request.path}' for ${request.method} is not found."))
   }

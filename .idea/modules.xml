@@ -4,7 +4,6 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/formapp.iml" filepath="$PROJECT_DIR$/.idea/modules/formapp.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/formapp-build.iml" filepath="$PROJECT_DIR$/.idea/modules/formapp-build.iml" />
-      <module fileurl="file://$PROJECT_DIR$/macro/macro.iml" filepath="$PROJECT_DIR$/macro/macro.iml" />
     </modules>
   </component>
 </project>
