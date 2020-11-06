@@ -1,8 +1,9 @@
 package sysdes.formapp
 
+import sysdes.formapp.http.Method._
 import java.net.Socket
 
-import sysdes.formapp.server.{Handler, Server}
+import sysdes.formapp.server.{DispatchContext, Dispatcher, Handler, Server}
 
 object StatelessServer extends Server(8001) {
   override def getHandler(socket: Socket) = new StatelessServerHandler(socket)
@@ -12,28 +13,41 @@ class StatelessServerHandler(socket: Socket) extends Handler(socket) {
   import http.Util._
   import sysdes.formapp.server.{NotFound, Ok, Request, Response}
 
-  override def handle(request: Request): Response = request match {
-    case Request("GET", "/", _, _, _)                  => index()
-    case Request("POST", "/", _, _, _)                 => index()
-    case Request("POST", "/name", _, _, _)             => name()
-    case Request("POST", "/gender", _, _, Some(body))  => gender(body)
-    case Request("POST", "/message", _, _, Some(body)) => message(body)
-    case Request("POST", "/confirm", _, _, Some(body)) => confirm(body)
-    case _                                             => NotFound(s"Requested resource '${request.path}' for ${request.method} is not found.")
+  val dispatcher: Dispatcher = new Dispatcher
+
+  dispatcher.bind("/", GET, (_, _) => index)
+  dispatcher.bind("/", POST, (_, _) => index)
+  dispatcher.bind("/name", POST, (_, _) => name())
+  dispatcher.bind("/gender", POST, (req, _) => gender(req.body.get))
+  dispatcher.bind("/message", POST, (req, _) => message(req.body.get))
+  dispatcher.bind("/confirm", POST, (req, _) => confirm(req.body.get))
+
+  val outerD = new Dispatcher
+  outerD.bindSub("/hoge", dispatcher)
+  outerD.bind("/hoge/:id/:name", GET, (_, params) => {
+    println(params)
+    NotFound("fuga")
+  })
+
+  override def handle(request: Request): Response = {
+    outerD.dump
+    outerD
+      .dispatch(DispatchContext.fromRequest(request))
+      .getOrElse(NotFound(s"Requested resource '${request.path}' for ${request.method} is not found."))
   }
 
   def index(): Response = {
-    Ok(genForm("/name", Map(), "アンケート開始", "start"))
+    Ok(genForm("name", Map(), "アンケート開始", "start"))
   }
 
   def name(): Response = {
-    Ok(genForm("/gender", Map(), """名前: <input name="name"> """, "next"))
+    Ok(genForm("gender", Map(), """名前: <input name="name"> """, "next"))
   }
 
   def gender(body: String): Response = {
     Ok(
       genForm(
-        "/message",
+        "message",
         parseFormData(body),
         """ 性別: <input type="radio" name="gender" value="male" required> 男性 <input type="radio" name="gender" value="female"> 女性 """,
         "next"
@@ -44,7 +58,7 @@ class StatelessServerHandler(socket: Socket) extends Handler(socket) {
   def message(body: String): Response = {
     Ok(
       genForm(
-        "/confirm",
+        "confirm",
         parseFormData(body),
         """ メッセージ: <br> <textarea name="message"></textarea> """,
         "next"

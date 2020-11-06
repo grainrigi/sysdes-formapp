@@ -16,5 +16,4 @@ abstract class Server(port: Int) extends App {
   }
 
   def getHandler(socket: Socket): Handler
-
 }

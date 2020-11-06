@@ -1,9 +1,12 @@
 package sysdes.formapp.server
 
+import sysdes.formapp.http
+import sysdes.formapp.http.Method
+
 import scala.collection.mutable.HashMap
 
 case class Request(
-    method: String,
+    method: Method,
     path: String,
     version: String,
     headers: HashMap[String, String] = HashMap(),
@@ -19,7 +22,9 @@ object Request {
     val requestPattern = """(.*?)\s+(.*?)\s+(.*?)$""".r
     in.readLine match {
       case requestPattern(method, path, version) =>
-        Some(Request(method, path, version))
+        http
+          .Method(method)
+          .map(Request(_, path, version))
       case _ => None
     }
   }.map(request => {

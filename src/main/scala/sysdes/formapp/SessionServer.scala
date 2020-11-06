@@ -1,5 +1,6 @@
 package sysdes.formapp
 
+import sysdes.formapp.http.Method._
 import java.net.Socket
 import java.util.UUID
 
@@ -32,13 +33,13 @@ class SessionServerHandler(socket: Socket) extends Handler(socket) {
   }
 
   def handleForm(request: Request, state: State): Response = request match {
-    case Request("GET", "/", _, _, _)                  => index()
-    case Request("POST", "/", _, _, _)                 => index()
-    case Request("POST", "/name", _, _, _)             => name()
-    case Request("POST", "/gender", _, _, Some(body))  => gender(body, state)
-    case Request("POST", "/message", _, _, Some(body)) => message(body, state)
-    case Request("POST", "/confirm", _, _, Some(body)) => confirm(body, state)
-    case _                                             => NotFound(s"Requested resource '${request.path}' for ${request.method} is not found.")
+    case Request(GET, "/", _, _, _)                  => index()
+    case Request(POST, "/", _, _, _)                 => index()
+    case Request(POST, "/name", _, _, _)             => name()
+    case Request(POST, "/gender", _, _, Some(body))  => gender(body, state)
+    case Request(POST, "/message", _, _, Some(body)) => message(body, state)
+    case Request(POST, "/confirm", _, _, Some(body)) => confirm(body, state)
+    case _                                           => NotFound(s"Requested resource '${request.path}' for ${request.method} is not found.")
   }
 
   def index(): Response = {
